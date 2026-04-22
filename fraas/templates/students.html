@@ -1,0 +1,652 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3>Students</h3>
+  <div class="d-flex gap-2">
+    <!-- Danger Actions Dropdown -->
+    <div class="dropdown">
+      <button class="btn btn-outline-danger dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+        <i class="fa-solid fa-trash me-1"></i> Cleanup
+      </button>
+      <ul class="dropdown-menu">
+        <li><a class="dropdown-item text-danger fw-semibold" href="#" data-bs-toggle="modal" data-bs-target="#bulkDeleteModal"><i class="fa-solid fa-file-excel w-20px"></i> Delete by CSV/Excel</a></li>
+        <li><hr class="dropdown-divider"></li>
+        <li>
+          <form method="post" action="{{ url_for('admin.students_delete_all') }}">
+            <button class="dropdown-item text-danger fw-bold" type="submit" onclick="return confirm('WARNING: Are you absolutely sure you want to completely wipe all students and delete the trained neural network? This CANNOT be undone!');"><i class="fa-solid fa-skull w-20px"></i> Delete ALL Students</button>
+          </form>
+        </li>
+      </ul>
+    </div>
+    
+    <button class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#uploadCsvModal"><i class="fa-solid fa-file-csv me-1"></i> Upload File</button>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addStudentModal">Add Student</button>
+  </div>
+</div>
+
+<div class="row mb-3 align-items-center">
+  <div class="col-md-5">
+    <div class="input-group shadow-sm">
+      <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-search text-muted"></i></span>
+      <input type="text" id="searchInput" class="form-control border-start-0 ps-0" placeholder="Search by Name, Roll No, or Class..." onkeyup="filterTable()">
+    </div>
+  </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped table-sm align-middle" id="dataTable">
+      <thead>
+        <tr>
+          <th>Roll No</th>
+          <th>Name</th>
+          <th>Class</th>
+          <th>Contact</th>
+          <th>Face Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in students %}
+        <tr>
+          <td>{{ s.roll_number }}</td>
+          <td class="fw-bold">
+            {{ s.name }}
+            {% if s.extra_data %}
+            <a tabindex="0" class="badge bg-secondary ms-1" role="button" data-bs-toggle="popover" data-bs-trigger="focus" title="Extra Data" data-bs-content="{{ s.extra_data|escape }}">
+              <i class="fa-solid fa-circle-info"></i>
+            </a>
+            {% endif %}
+          </td>
+          <td>{{ s.class_name }} {{ s.section or '' }}</td>
+          <td>
+            {% if s.email %}<div class="small"><i class="fa-solid fa-envelope border-0 text-muted"></i> {{ s.email }}</div>{% endif %}
+            {% if s.phone %}<div class="small"><i class="fa-solid fa-phone border-0 text-muted"></i> {{ s.phone }}</div>{% endif %}
+          </td>
+          <td>
+            {% if s.capture_count >= 20 %}
+            <span class="badge bg-success rounded-pill px-3 py-2"><i class="fa-solid fa-check-circle me-1"></i>Captured</span>
+            {% elif s.capture_count > 0 %}
+            <span class="badge bg-warning text-dark rounded-pill px-3 py-2"><i class="fa-solid fa-triangle-exclamation me-1"></i>Partial ({{ s.capture_count }}/20)</span>
+            {% else %}
+            <span class="badge bg-danger rounded-pill px-3 py-2"><i class="fa-solid fa-xmark-circle me-1"></i>Not Captured</span>
+            {% endif %}
+          </td>
+          <td>
+            <button type="button" class="btn btn-sm {% if s.capture_count >= 20 %}btn-outline-secondary{% else %}btn-success{% endif %} mb-1" onclick="openCaptureModal('{{ s.id }}', '{{ s.name|escape }}', '{{ s.roll_number|escape }}', '{{ s.class_name|escape }} - {{ s.section|escape }}')">
+              <i class="fa-solid fa-camera-retro border-0"></i> {% if s.capture_count >= 20 %}Retake{% else %}Capture{% endif %}
+            </button>
+            <button type="button" class="btn btn-sm btn-info mb-1" onclick="openEditModal('{{ s.id }}', '{{ s.roll_number|escape }}', '{{ s.name|escape }}', '{{ s.class_name|escape }}', '{{ s.section|escape }}', '{{ s.email|escape }}', '{{ s.phone|escape }}')">
+                <i class="fa-solid fa-pen border-0"></i> Edit
+            </button>
+            <form method="post" action="{{ url_for('admin.students_delete', student_id=s.id) }}" class="d-inline">
+              <button class="btn btn-sm btn-danger mb-1" onclick="return confirm('Delete this student completely?');"><i class="fa-solid fa-trash border-0"></i> Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+</div>
+
+<div class="modal fade" id="addStudentModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{{ url_for('admin.students_add') }}">
+        <div class="modal-header">
+          <h5 class="modal-title">Add Student</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Roll Number</label>
+            <input type="text" name="roll_number" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Name</label>
+            <input type="text" name="name" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Class</label>
+            <input type="text" name="class_name" class="form-control" required placeholder="e.g., 8">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Section</label>
+            <input type="text" name="section" class="form-control" placeholder="e.g., A">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Phone <span class="text-danger">*</span> <small class="text-muted fw-normal">(Req. for fast SMS)</small></label>
+            <input type="text" name="phone" class="form-control" placeholder="10-digit mobile" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<div class="modal fade" id="uploadCsvModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{{ url_for('admin.students_upload_csv') }}" enctype="multipart/form-data">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="fa-solid fa-cloud-arrow-up me-2 text-success"></i> Bulk Upload CSV</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-info py-2 small">
+            Your CSV file must include headers for <strong>Name</strong> and <strong>Roll Number</strong>. Optional headers: <strong>Class</strong>, <strong>Section</strong>.
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold">Select CSV File</label>
+            <input type="file" name="csv_file" class="form-control" accept=".csv" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success"><i class="fa-solid fa-cloud-arrow-up me-1"></i> Import Students</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="bulkDeleteModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{{ url_for('admin.students_bulk_delete') }}" enctype="multipart/form-data">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title"><i class="fa-solid fa-file-excel me-2"></i> Bulk Delete by File</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-warning py-2 small fw-semibold">
+            <i class="fa-solid fa-triangle-exclamation me-1"></i> Warning: Uploading a CSV or Excel file here will PERMANENTLY delete all matching students (by Roll Number) along with their face data!
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold">Select CSV or Excel File</label>
+            <input type="file" name="csv_file" class="form-control" accept=".csv, .xlsx" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to completely erase the students listed in this file?');"><i class="fa-solid fa-trash me-1"></i> Permanently Delete Matches</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editStudentModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="editStudentForm" method="post" action="">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="fa-solid fa-user-pen me-2 text-info"></i> Edit Student</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-bold">Roll Number</label>
+            <input type="text" id="edit_roll_number" name="roll_number" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold">Name</label>
+            <input type="text" id="edit_name" name="name" class="form-control" required>
+          </div>
+          <div class="row mb-3">
+            <div class="col-6">
+              <label class="form-label fw-bold">Class</label>
+              <input type="text" id="edit_class_name" name="class_name" class="form-control" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-bold">Section</label>
+              <input type="text" id="edit_section" name="section" class="form-control">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold">Email (Optional)</label>
+            <input type="email" id="edit_email" name="email" class="form-control">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold">Phone (Optional)</label>
+            <input type="text" id="edit_phone" name="phone" class="form-control">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-info text-white fw-bold"><i class="fa-solid fa-floppy-disk me-1"></i> Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Full-Screen Capture Modal and Logic -->
+<div id="captureModal" class="capture-modal-overlay d-none">
+  <div class="capture-modal-content d-flex flex-column h-100">
+    <!-- Top Bar -->
+    <div class="capture-header d-flex flex-wrap justify-content-between align-items-center gap-3 p-3 p-md-4 bg-white border-bottom shadow-sm">
+      <div class="d-flex align-items-center gap-3">
+        <button class="btn btn-outline-secondary rounded-circle px-3 py-2" onclick="closeCaptureModal()"><i class="fa-solid fa-arrow-left"></i></button>
+        <div>
+          <h4 class="mb-0 fw-bold fs-5" id="capStudentName">Student Name</h4>
+          <span class="text-muted small" id="capStudentDetails">Roll: 123 | Class: 10 - A</span>
+        </div>
+      </div>
+      <div class="capture-progress text-start text-sm-end w-100" style="max-width: 200px;">
+        <h5 class="mb-1 fw-bold fs-6 text-primary">Captured: <span id="capCount">0</span> / 20</h5>
+        <div class="progress" style="width: 100%; height: 8px;">
+          <div id="capProgressBar" class="progress-bar bg-primary" role="progressbar" style="width: 0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="capture-body flex-grow-1 d-flex flex-column flex-lg-row bg-light overflow-auto" style="min-height: 0;">
+      
+      <!-- Camera Area (Center Focus) -->
+      <div class="camera-section flex-grow-1 d-flex flex-column align-items-center justify-content-center position-relative p-3 p-lg-4">
+        
+        <div class="camera-wrapper position-relative bg-dark rounded-4 shadow-lg overflow-hidden w-100" style="max-width: 640px; aspect-ratio: 4/3;">
+          <video id="captureVideo" autoplay playsinline class="w-100 h-100 object-fit-cover"></video>
+          <canvas id="captureCanvas" class="d-none"></canvas>
+          
+          <!-- Alignment Guide Overlay -->
+          <div id="faceGuideOval" class="face-guide-oval"></div>
+          
+          <!-- Dynamic Feedback Overlay -->
+          <div id="captureFeedback" class="capture-feedback font-monospace text-center py-2 px-4 rounded-pill">Initializing...</div>
+          
+          <div id="cameraFlash" class="camera-flash d-none"></div>
+        </div>
+        
+        <!-- Controls -->
+        <div class="capture-controls mt-4 bg-white p-3 border rounded-4 shadow-sm d-flex flex-wrap justify-content-center align-items-center gap-2 gap-md-3 w-100" style="max-width: 640px;">
+          <button id="btnStartStream" class="btn btn-primary" onclick="startCamera()"><i class="fa-solid fa-camera border-0"></i> Start Camera</button>
+          <button id="btnStopStream" class="btn btn-danger d-none" onclick="stopCamera()"><i class="fa-solid fa-video-slash border-0"></i> Stop Camera</button>
+          
+          <div class="vr mx-1 d-none d-md-block"></div>
+          
+          <button id="btnSingleCapture" class="btn btn-success d-none" onclick="takeSinglePhoto()"><i class="fa-solid fa-camera-retro border-0"></i> Capture</button>
+          
+          <div class="form-check form-switch ms-0 ms-md-2 d-none d-flex align-items-center" id="autoCaptureGroup">
+            <input class="form-check-input mt-0" type="checkbox" role="switch" id="autoCaptureToggle" onchange="toggleAutoCapture()">
+            <label class="form-check-label ms-2 fw-semibold text-primary" for="autoCaptureToggle">Auto Capture</label>
+          </div>
+          
+          <div class="d-flex align-items-center gap-2 ms-0 ms-md-2 d-none" id="speedControlGroup">
+            <label class="small text-muted fw-semibold mb-0">Speed:</label>
+            <select id="autoCaptureSpeed" class="form-select form-select-sm" style="width: auto;" onchange="updateAutoSpeed()">
+              <option value="1500">Slow</option>
+              <option value="800" selected>Medium</option>
+              <option value="300">Fast</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right/Bottom Panel for Thumbnails -->
+      <div class="thumbnails-section bg-white border-top border-lg-0 border-start-lg p-3 p-lg-4 d-flex flex-column desktop-sidebar">
+        <h6 class="fw-bold mb-3 text-secondary d-flex justify-content-between align-items-center">
+          <span>Captured Images</span>
+          <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="clearAllCaptures()"><i class="fa-solid fa-trash-can border-0"></i> Clear</button>
+        </h6>
+        <div id="thumbnailsContainer" class="d-flex flex-wrap gap-2 justify-content-start align-items-start">
+          <!-- Thumbnails injected here -->
+        </div>
+        
+        <!-- Success State inside panel -->
+        <div id="captureCompleteState" class="mt-4 p-4 bg-success-soft text-center rounded-4 border d-none">
+          <div class="text-success mb-2"><i class="fa-solid fa-circle-check fa-3x"></i></div>
+          <h5 class="fw-bold text-success mb-1">Target Reached</h5>
+          <p class="small text-muted">20 images captured successfully.</p>
+          <button class="btn btn-success w-100 fw-bold shadow-sm" onclick="trainModel()"><i class="fa-solid fa-brain me-2 border-0"></i> Train Model</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+/* Face Capture Modal */
+.desktop-sidebar {
+  width: 100%;
+  flex: 1 1 auto;
+  max-height: 35vh;
+  overflow-y: auto;
+}
+@media (min-width: 992px) {
+  .desktop-sidebar {
+    width: 350px;
+    max-height: 100%;
+    flex: 0 0 350px;
+  }
+}
+
+.capture-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #F9FAFB;
+  z-index: 1050;
+}
+.face-guide-oval {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 250px; height: 350px;
+  max-width: 70%; max-height: 80%;
+  border: 3px dashed rgba(255,255,255,0.6);
+  border-radius: 50%;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);
+  pointer-events: none;
+  transition: border-color 0.3s;
+}
+.face-guide-oval.detected {
+  border-color: #10B981;
+  border-style: solid;
+}
+.capture-feedback {
+  position: absolute;
+  bottom: 20px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.7);
+  color: white;
+  z-index: 10;
+}
+.camera-flash {
+  position: absolute; top:0; left:0; right:0; bottom:0;
+  background: white;
+  opacity: 0; pointer-events: none;
+  z-index: 20;
+}
+.camera-flash.flash-anim {
+  animation: flashEffect 0.4s ease-out;
+}
+@keyframes flashEffect {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.thumb-card {
+  position: relative; width: 95px; height: 95px;
+  border-radius: 8px; overflow: hidden;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); border: 2px solid #E5E7EB;
+}
+.thumb-card img { width: 100%; height: 100%; object-fit: cover; }
+.thumb-delete-btn {
+  position: absolute; top: 4px; right: 4px;
+  width: 24px; height: 24px; border-radius: 50%;
+  background: rgba(239, 68, 68, 0.9); color: white;
+  border: none; font-size: 0.7rem;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; opacity: 0; transition: opacity 0.2s;
+}
+.thumb-card:hover .thumb-delete-btn { opacity: 1; }
+</style>
+
+<script>
+let currentStudentId = null;
+let captureStream = null;
+let captureCount = 0;
+const MAX_CAPTURES = 20;
+let autoCaptureInterval = null;
+let lastCaptureTime = 0;
+let capturedImagesData = []; // Store base64 strings
+
+window.addEventListener('beforeunload', function (e) {
+    if (captureStream) {
+        e.preventDefault();
+        e.returnValue = "Camera is currently active and faces are being captured. Are you sure you want to leave?";
+        return e.returnValue;
+    }
+});
+
+function openCaptureModal(id, name, roll, cls) {
+    currentStudentId = id;
+    document.getElementById('capStudentName').innerText = name;
+    document.getElementById('capStudentDetails').innerText = `Roll: ${roll} | Class: ${cls}`;
+    
+    // Reset state
+    clearAllCaptures();
+    
+    document.getElementById('captureModal').classList.remove('d-none');
+}
+
+function closeCaptureModal() {
+    stopCamera();
+    document.getElementById('captureModal').classList.add('d-none');
+}
+
+async function startCamera() {
+    try {
+        captureStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const videoEl = document.getElementById('captureVideo');
+        videoEl.srcObject = captureStream;
+        
+        document.getElementById('btnStartStream').classList.add('d-none');
+        document.getElementById('btnStopStream').classList.remove('d-none');
+        document.getElementById('btnSingleCapture').classList.remove('d-none');
+        document.getElementById('autoCaptureGroup').classList.remove('d-none');
+        document.getElementById('speedControlGroup').classList.remove('d-none');
+        
+        const feedbackEl = document.getElementById('captureFeedback');
+        feedbackEl.innerText = "Align your face properly";
+        feedbackEl.classList.remove('text-danger');
+        feedbackEl.classList.add('text-warning');
+        document.getElementById('faceGuideOval').classList.add('detected');
+        
+    } catch (err) {
+        alert("Camera permission denied or camera not found!");
+    }
+}
+
+function stopCamera() {
+    if(captureStream) {
+        captureStream.getTracks().forEach(t => t.stop());
+        captureStream = null;
+    }
+    document.getElementById('captureVideo').srcObject = null;
+    document.getElementById('autoCaptureToggle').checked = false;
+    toggleAutoCapture(); // clear interval if active
+    
+    document.getElementById('btnStartStream').classList.remove('d-none');
+    document.getElementById('btnStopStream').classList.add('d-none');
+    document.getElementById('btnSingleCapture').classList.add('d-none');
+    document.getElementById('autoCaptureGroup').classList.add('d-none');
+    document.getElementById('speedControlGroup').classList.add('d-none');
+    document.getElementById('faceGuideOval').classList.remove('detected');
+    document.getElementById('captureFeedback').innerText = "Camera Off";
+}
+
+function takeSinglePhoto() {
+    if(!captureStream || captureCount >= MAX_CAPTURES) return;
+    
+    // Check cooldown to prevent duplicate captures too quickly
+    const now = Date.now();
+    if(now - lastCaptureTime < 300) return; // 300ms min delay
+    lastCaptureTime = now;
+    
+    const flashEl = document.getElementById('cameraFlash');
+    // Visual flash
+    flashEl.classList.remove('d-none', 'flash-anim');
+    void flashEl.offsetWidth; // trigger reflow
+    flashEl.classList.add('flash-anim');
+    
+    const videoEl = document.getElementById('captureVideo');
+    const canvasEl = document.getElementById('captureCanvas');
+    // Canvas snapshot
+    canvasEl.width = videoEl.videoWidth;
+    canvasEl.height = videoEl.videoHeight;
+    const ctx = canvasEl.getContext('2d');
+    ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+    
+    const dataUrl = canvasEl.toDataURL('image/jpeg');
+    
+    // Add thumbnail UI
+    captureCount++;
+    updateProgressUI();
+    
+    const thumbContainer = document.getElementById('thumbnailsContainer');
+    const thumbId = 'thumb_' + Date.now();
+    capturedImagesData[thumbId] = dataUrl;
+    
+    const thumbHtml = `
+      <div class="thumb-card" id="${thumbId}">
+        <img src="${dataUrl}" alt="Cap">
+        <button class="thumb-delete-btn" onclick="deleteThumb('${thumbId}')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+    `;
+    thumbContainer.insertAdjacentHTML('beforeend', thumbHtml);
+    
+    const feedbackEl = document.getElementById('captureFeedback');
+    feedbackEl.innerHTML = `<span class="text-success"><i class="fa-solid fa-check-circle"></i> Image captured (${captureCount}/${MAX_CAPTURES})</span>`;
+    
+    // Check completion
+    if(captureCount >= MAX_CAPTURES) {
+        completeCapture();
+    }
+}
+
+function deleteThumb(id) {
+    const el = document.getElementById(id);
+    if(el) {
+        el.remove();
+        delete capturedImagesData[id];
+        captureCount--;
+        updateProgressUI();
+        document.getElementById('captureCompleteState').classList.add('d-none');
+        document.getElementById('autoCaptureToggle').disabled = false;
+        document.getElementById('btnSingleCapture').disabled = false;
+    }
+}
+
+function clearAllCaptures() {
+    document.getElementById('thumbnailsContainer').innerHTML = '';
+    captureCount = 0;
+    capturedImagesData = {};
+    updateProgressUI();
+    document.getElementById('captureCompleteState').classList.add('d-none');
+    document.getElementById('autoCaptureToggle').disabled = false;
+    document.getElementById('btnSingleCapture').disabled = false;
+    document.getElementById('captureFeedback').innerText = "Awaiting Capture";
+}
+
+function updateProgressUI() {
+    document.getElementById('capCount').innerText = captureCount;
+    document.getElementById('capProgressBar').style.width = (captureCount / MAX_CAPTURES * 100) + '%';
+}
+
+function updateAutoSpeed() {
+    if(document.getElementById('autoCaptureToggle').checked) {
+        toggleAutoCapture(); // restart with new speed
+    }
+}
+
+function toggleAutoCapture() {
+    const feedbackEl = document.getElementById('captureFeedback');
+    clearInterval(autoCaptureInterval);
+    
+    const isAuto = document.getElementById('autoCaptureToggle').checked;
+    if(isAuto) {
+        if(captureCount >= MAX_CAPTURES) {
+            document.getElementById('autoCaptureToggle').checked = false;
+            return;
+        }
+        const speed = parseInt(document.getElementById('autoCaptureSpeed').value) || 800;
+        autoCaptureInterval = setInterval(() => {
+            takeSinglePhoto();
+        }, speed);
+        feedbackEl.innerHTML = `<span class="text-primary"><i class="fa-solid fa-spinner fa-spin"></i> Auto-capturing...</span>`;
+    } else {
+        feedbackEl.innerHTML = `<span class="text-warning">Auto-capture paused.</span>`;
+    }
+}
+
+function completeCapture() {
+    // Stop auto if running
+    document.getElementById('autoCaptureToggle').checked = false;
+    clearInterval(autoCaptureInterval);
+    
+    // Disable buttons
+    document.getElementById('autoCaptureToggle').disabled = true;
+    document.getElementById('btnSingleCapture').disabled = true;
+    
+    const feedbackEl = document.getElementById('captureFeedback');
+    feedbackEl.innerHTML = `<span class="text-success fw-bold"><i class="fa-solid fa-check-double"></i> Capture Complete</span>`;
+    document.getElementById('faceGuideOval').classList.remove('detected');
+    
+    // Show success panel
+    document.getElementById('captureCompleteState').classList.remove('d-none');
+}
+
+function trainModel() {
+    const btn = event.currentTarget || event.target;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i> Training Model...';
+    btn.disabled = true;
+
+    // Use current URL context to guess admin prefix, usually /admin/api/students/...
+    // Based on standard Flask url_for conventions
+    let targetUrl = `/api/students/${currentStudentId}/upload_faces`;
+
+    fetch(targetUrl, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({images: Object.values(capturedImagesData)})
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.success) {
+            alert("Model trained successfully! " + data.message);
+            closeCaptureModal();
+            location.reload();
+        } else {
+            alert("Training failed: " + data.error);
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    })
+    .catch(err => {
+        alert("Network error: Could not reach training server.");
+        console.error(err);
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+}
+
+function openEditModal(id, roll, name, cls, sec, email, phone) {
+    document.getElementById('edit_roll_number').value = roll;
+    document.getElementById('edit_name').value = name;
+    document.getElementById('edit_class_name').value = cls;
+    document.getElementById('edit_section').value = sec;
+    document.getElementById('edit_email').value = email;
+    document.getElementById('edit_phone').value = phone;
+    
+    // Set form action dynamically based on student ID using Flask url_for template
+    document.getElementById('editStudentForm').action = "{{ url_for('admin.students_edit', student_id=0) }}".replace('/0/', '/' + id + '/');
+    
+    const editModal = new bootstrap.Modal(document.getElementById('editStudentModal'));
+    editModal.show();
+}
+
+document.addEventListener("DOMContentLoaded", function(){
+    // Initialize bootstrap popovers for extra data viewing
+    var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'))
+    var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
+      return new bootstrap.Popover(popoverTriggerEl)
+    })
+});
+
+function filterTable() {
+    let input = document.getElementById("searchInput").value.toLowerCase();
+    let rows = document.querySelectorAll("#dataTable tbody tr");
+    rows.forEach(row => {
+        let text = row.innerText.toLowerCase();
+        row.style.display = text.includes(input) ? "" : "none";
+    });
+}
+</script>
+{% endblock %}
+
+

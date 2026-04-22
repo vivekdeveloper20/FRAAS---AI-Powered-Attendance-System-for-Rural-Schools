@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="row align-items-center mb-4">
+  <div class="col-md-6">
+    <h3 class="fw-bold mb-0"><i class="fa-solid fa-user-secret text-danger me-2"></i> Unknown Profiles</h3>
+    <p class="text-muted small mb-0 mt-1">Review and assign unidentified individuals</p>
+  </div>
+  <div class="col-md-6 text-end">
+    {% if faces %}
+    <form method="post" action="{{ url_for('admin.unknown_faces_clear') }}" class="d-inline" onsubmit="return confirm('Are you sure you want to permanently clear all unknown faces?');">
+      <button type="submit" class="btn btn-outline-danger shadow-sm"><i class="fa-solid fa-trash me-2"></i>Clear All Unknowns</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{% if not faces %}
+<div class="card border-dashed bg-light mt-5">
+    <div class="card-body text-center py-5">
+        <i class="fa-solid fa-shield-check fa-4x text-success opacity-50 mb-3"></i>
+        <h4 class="fw-bold text-dark mb-1">Zero Unknowns Detected</h4>
+        <p class="text-muted">No external faces have breached the recognition threshold.</p>
+    </div>
+</div>
+{% else %}
+<div class="row row-cols-1 row-cols-md-3 row-cols-lg-4 g-4">
+  {% for face in faces %}
+  <div class="col">
+    <div class="card h-100 shadow-sm border-0 rounded-4 overflow-hidden unknown-card">
+      <div class="position-relative">
+          <img src="{{ url_for('admin.unknown_faces_image', filename=face.filename) }}" class="card-img-top object-fit-cover" style="height: 250px;" alt="Unknown Face">
+          <div class="position-absolute top-0 end-0 m-2 badge bg-danger text-white rounded-pill shadow-sm"><i class="fa-solid fa-clock me-1"></i> {{ face.time }}</div>
+      </div>
+      <div class="card-body p-3">
+        <h6 class="fw-bold text-dark mb-1"><i class="fa-regular fa-calendar-days text-primary me-2"></i>{{ face.date }}</h6>
+        <p class="small text-muted mb-3">System detected an unregistered entity moving through the camera threshold.</p>
+        
+        <div class="d-flex flex-column gap-2">
+            <button class="btn btn-primary btn-sm fw-semibold w-100" onclick="openAssignModal('{{ face.filename }}')">
+                <i class="fa-solid fa-user-plus me-1"></i> Assign to Student
+            </button>
+            <form method="post" action="{{ url_for('admin.unknown_faces_delete') }}" class="w-100" onsubmit="return confirm('Delete this unknown face permanently?');">
+                <input type="hidden" name="filename" value="{{ face.filename }}">
+                <button type="submit" class="btn btn-outline-danger btn-sm fw-semibold w-100">
+                    <i class="fa-solid fa-trash me-1"></i> Delete Trace
+                </button>
+            </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Assign Modal -->
+<div class="modal fade" id="assignModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+      <form method="post" action="{{ url_for('admin.unknown_faces_assign') }}">
+        <div class="modal-header bg-primary text-white border-0 py-3">
+          <h5 class="modal-title fw-bold"><i class="fa-solid fa-user-plus me-2"></i> Assign Unknown Face</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4 bg-light">
+          <input type="hidden" name="filename" id="assignFilename">
+          
+          <div class="text-center mb-4">
+              <img src="" id="assignImagePreview" class="rounded object-fit-cover shadow-sm border border-white border-3" style="width: 150px; height: 150px;">
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label fw-bold text-dark">Map to Registered Student</label>
+            <select name="student_id" class="form-select form-select-lg shadow-sm" required>
+              <option value="" disabled selected>-- Select a Student --</option>
+              {% for s in students %}
+              <option value="{{ s.id }}">{{ s.name }} ({{ s.roll_number }}) - {{ s.class_name }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text mt-2"><i class="fa-solid fa-circle-info text-primary me-1"></i> The AI model will be automatically retrained to recognize this face as the selected student securely.</div>
+          </div>
+          
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-cloud-arrow-up me-2"></i> Confirm Assignment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function openAssignModal(filename) {
+    document.getElementById('assignFilename').value = filename;
+    document.getElementById('assignImagePreview').src = "/unknown-faces/image/" + filename;
+    var myModal = new bootstrap.Modal(document.getElementById('assignModal'));
+    myModal.show();
+}
+</script>
+
+<style>
+.unknown-card {
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s;
+}
+.unknown-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 30px rgba(0,0,0,0.1) !important;
+}
+.border-dashed {
+    border: 2px dashed #cbd5e1;
+}
+</style>
+{% endblock %}

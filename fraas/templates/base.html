@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>FRAAS - Facial Recognition Automated Attendance System</title>
+    <!-- Google Fonts for modern typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom CSS -->
+    <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-icon bg-primary-soft">
+                    <i class="fa-solid fa-face-viewfinder text-primary"></i>
+                </div>
+                <div class="logo-text">
+                    <h2>FRAAS</h2>
+                    <span>{% if current_user.is_authenticated %}{{ current_user.role }} Panel{% else %}Attendance System{% endif %}</span>
+                </div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'admin.dashboard' %}active{% endif %}" href="{{ url_for('admin.dashboard') }}">
+                            <i class="fa-solid fa-chart-pie"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'attendance.attendance_page' %}active{% endif %}" href="{{ url_for('attendance.attendance_page') }}">
+                            <i class="fa-solid fa-video"></i> Live Attendance
+                        </a>
+                    </li>
+                    {% if current_user.is_admin %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'admin.users_manage' %}active{% endif %}" href="{{ url_for('admin.users_manage') }}">
+                            <i class="fa-solid fa-users-gear"></i> Manage Users
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'admin.students_list' %}active{% endif %}" href="{{ url_for('admin.students_list') }}">
+                            <i class="fa-solid fa-user-plus"></i> Register Student
+                        </a>
+                    </li>
+                    {% endif %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'admin.reports' %}active{% endif %}" href="{{ url_for('admin.reports') }}">
+                            <i class="fa-solid fa-clipboard-list"></i> Attendance Logs
+                        </a>
+                    </li>
+                    {% if current_user.is_admin %}
+                    <li class="nav-item mt-2">
+                        <a class="nav-link text-danger-soft {% if request.endpoint == 'admin.unknown_faces' %}active bg-danger text-white{% endif %}" href="{{ url_for('admin.unknown_faces') }}">
+                            <i class="fa-solid fa-user-secret"></i> Unknown Faces
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <a class="nav-link logout-link" href="{{ url_for('auth.logout') }}">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="topbar d-flex justify-content-between align-items-center">
+                <div class="topbar-search position-relative" style="min-width: 300px;">
+                    <div class="search-wrap">
+                        <i class="fa-solid fa-search"></i>
+                        <input type="text" id="globalSearchInput" placeholder="Search student by name or ID..." autocomplete="off">
+                    </div>
+                    <div id="globalSearchResults" class="position-absolute w-100 bg-white shadow-lg rounded mt-2 d-none overflow-hidden list-group" style="z-index: 1050; max-height: 400px; overflow-y: auto;"></div>
+                </div>
+                <div class="topbar-actions">
+                    <div class="date-time-display badge bg-light text-dark shadow-sm">
+                        <i class="fa-regular fa-calendar-days me-2"></i><span id="currentDate"></span>
+                        <i class="fa-regular fa-clock ms-3 me-2"></i><span id="currentTime"></span>
+                    </div>
+                    <div class="user-profile ms-4">
+                        <div class="avatar">
+                            <i class="fa-solid fa-user-tie"></i>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content-wrapper container-fluid">
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="flash-messages mt-3">
+                        {% for category, msg in messages %}
+                            <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm border-0" role="alert">
+                                {{ msg }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                <div class="mt-4 pb-5">
+                    {% block content %}{% endblock %}
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Global Student Detail Modal -->
+    <div class="modal fade" id="globalStudentModal" tabindex="-1">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+          <div class="modal-header bg-primary text-white border-0 py-3">
+            <h5 class="modal-title fw-bold"><i class="fa-solid fa-user-graduate me-2"></i> Student Profile</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body p-0" id="globalStudentModalBody">
+             <div class="text-center py-5"><i class="fa-solid fa-circle-notch fa-spin fa-3x text-primary opacity-50"></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+          const searchInput = document.getElementById("globalSearchInput");
+          const resultsBox = document.getElementById("globalSearchResults");
+          const detailsModal = new bootstrap.Modal(document.getElementById('globalStudentModal'));
+          const modalBody = document.getElementById('globalStudentModalBody');
+
+          searchInput.addEventListener("input", async (e) => {
+              const q = e.target.value.trim();
+              if (q.length < 1) {
+                  resultsBox.classList.add("d-none");
+                  return;
+              }
+
+              try {
+                  const res = await fetch(`{{ url_for('admin.api_search') }}?q=${encodeURIComponent(q)}`);
+                  const data = await res.json();
+                  
+                  if (data.success) {
+                      resultsBox.innerHTML = "";
+                      if (data.results.length === 0) {
+                          resultsBox.innerHTML = `<div class="p-3 text-muted text-center small"><i class="fa-solid fa-magnifying-glass me-2"></i> No student found</div>`;
+                      } else {
+                          data.results.forEach(s => {
+                              const item = document.createElement('a');
+                              item.href = "#";
+                              item.className = "list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2";
+                              item.innerHTML = `
+                                <div>
+                                  <div class="fw-bold text-dark">${s.name}</div>
+                                  <div class="small text-muted"><i class="fa-solid fa-id-badge me-1"></i> ${s.roll_number} &nbsp;&bull;&nbsp; Class: ${s.class_name} ${s.section}</div>
+                                </div>
+                                <i class="fa-solid fa-chevron-right text-muted small"></i>
+                              `;
+                              item.addEventListener('click', (ev) => {
+                                  ev.preventDefault();
+                                  resultsBox.classList.add("d-none");
+                                  searchInput.value = "";
+                                  openStudentProfile(s.id);
+                              });
+                              resultsBox.appendChild(item);
+                          });
+                      }
+                      resultsBox.classList.remove("d-none");
+                  }
+              } catch (err) {
+                  console.error("Search failed:", err);
+              }
+          });
+
+          // Close dropdown when clicking outside
+          document.addEventListener("click", (e) => {
+              if (!searchInput.contains(e.target) && !resultsBox.contains(e.target)) {
+                  resultsBox.classList.add("d-none");
+              }
+          });
+
+          async function openStudentProfile(id) {
+              modalBody.innerHTML = `<div class="text-center py-5"><i class="fa-solid fa-spinner fa-spin fa-2x text-primary opacity-50"></i><div class="mt-2 text-muted">Retrieving Data...</div></div>`;
+              detailsModal.show();
+              
+              try {
+                  const res = await fetch(`/api/student/${id}`);
+                  const data = await res.json();
+                  if (data.success) {
+                      const s = data.student;
+                      const capBadge = s.is_captured ? 
+                          `<span class="badge bg-success shadow-sm px-3 py-2 rounded-pill"><i class="fa-solid fa-check-circle me-1"></i>Captured (Count: ${s.capture_count})</span>` : 
+                          `<span class="badge bg-danger shadow-sm px-3 py-2 rounded-pill"><i class="fa-solid fa-xmark-circle me-1"></i>Not Captured</span>`;
+                          
+                      const extra = s.extra_data ? `
+                        <div class="mb-2"><strong><i class="fa-solid fa-file-invoice text-muted w-20px"></i> Extra Data:</strong></div>
+                        <pre class="bg-light p-3 rounded-3 small text-muted border">${s.extra_data}</pre>
+                      ` : "";
+                      
+                      const emailBlock = s.email ? `<div><i class="fa-solid fa-envelope w-20px text-muted"></i> ${s.email}</div>` : "";
+                      const phoneBlock = s.phone ? `<div><i class="fa-solid fa-phone w-20px text-muted"></i> ${s.phone}</div>` : "";
+                      
+                      modalBody.innerHTML = `
+                        <div class="row g-0">
+                          <div class="col-md-5 bg-light p-4 border-end">
+                            <div class="text-center mb-4">
+                              <img src="/api/student/${s.id}/photo?t=${new Date().getTime()}" alt="Profile" class="rounded-circle shadow-sm mb-3" width="120" height="120" style="object-fit: cover; border: 4px solid white; background-color: #fff;">
+                              <h4 class="fw-bold text-dark mb-1">${s.name}</h4>
+                              <span class="badge bg-secondary mb-3 fs-6">${s.roll_number}</span>
+                            </div>
+                            
+                            <div class="vstack gap-2 text-start small">
+                              <div><i class="fa-solid fa-graduation-cap w-20px text-muted"></i> <strong>Class:</strong> ${s.class_name} ${s.section || ''}</div>
+                              ${emailBlock}
+                              ${phoneBlock}
+                            </div>
+                            <hr class="my-3 opacity-25">
+                            <div class="text-center mt-3">
+                              ${capBadge}
+                            </div>
+                          </div>
+                          
+                          <div class="col-md-7 p-4 bg-white">
+                            <h6 class="fw-bold text-secondary mb-3 border-bottom pb-2"><i class="fa-solid fa-calendar-check me-2"></i> Attendance Overview</h6>
+                            
+                            <div class="row g-3 text-center mb-4">
+                              <div class="col-4">
+                                <div class="bg-light p-3 rounded-3 border h-100">
+                                  <div class="fs-4 fw-bold text-dark">${s.total_days}</div>
+                                  <div class="small fw-semibold text-muted text-uppercase" style="font-size: 0.7rem;">Days</div>
+                                </div>
+                              </div>
+                              <div class="col-4">
+                                <div class="bg-success-soft p-3 rounded-3 border border-success-subtle h-100">
+                                  <div class="fs-4 fw-bold text-success">${s.present_count}</div>
+                                  <div class="small fw-semibold text-success text-uppercase" style="font-size: 0.7rem;">Present</div>
+                                </div>
+                              </div>
+                              <div class="col-4">
+                                <div class="bg-danger-soft p-3 rounded-3 border border-danger-subtle h-100">
+                                  <div class="fs-4 fw-bold text-danger">${s.absent_count}</div>
+                                  <div class="small fw-semibold text-danger text-uppercase" style="font-size: 0.7rem;">Absent</div>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div class="mb-4">
+                              <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="small fw-bold text-secondary text-uppercase">Overall Attendance</span>
+                                <span class="fw-bold fs-5 ${s.attendance_percentage >= 75 ? 'text-success' : s.attendance_percentage >= 50 ? 'text-warning' : 'text-danger'}">${s.attendance_percentage}%</span>
+                              </div>
+                              <div class="progress" style="height: 10px;">
+                                <div class="progress-bar ${s.attendance_percentage >= 75 ? 'bg-success' : s.attendance_percentage >= 50 ? 'bg-warning' : 'bg-danger'}" role="progressbar" style="width: ${s.attendance_percentage}%;" aria-valuenow="${s.attendance_percentage}" aria-valuemin="0" aria-valuemax="100"></div>
+                              </div>
+                            </div>
+                            
+                            <h6 class="fw-bold text-secondary mb-2 mt-2"><i class="fa-solid fa-clock-rotate-left me-2"></i> Last Seen</h6>
+                            <div class="bg-light p-3 border rounded-3 d-flex justify-content-between align-items-center mb-3">
+                              <div class="fw-semibold text-dark">${s.last_date}</div>
+                              <div class="badge bg-secondary font-monospace"><i class="fa-solid fa-stopwatch me-1"></i> ${s.last_time || '--:-- --'}</div>
+                            </div>
+                            
+                            ${extra}
+                          </div>
+                        </div>
+                      `;
+                  } else {
+                      modalBody.innerHTML = `<div class="p-5 text-center text-danger"><i class="fa-solid fa-triangle-exclamation fa-2x mb-3"></i><br>Error loading profile</div>`;
+                  }
+              } catch(e) {
+                  modalBody.innerHTML = `<div class="p-5 text-center text-danger"><i class="fa-solid fa-plug-circle-xmark fa-2x mb-3"></i><br>Network Connection Error</div>`;
+                  console.error(e);
+              }
+          }
+      });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

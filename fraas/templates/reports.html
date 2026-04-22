@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row align-items-center mb-3">
+  <div class="col-md-6">
+    <h3 class="mb-0">Reports & Export</h3>
+  </div>
+  <div class="col-md-6 text-end">
+    <div class="input-group shadow-sm">
+      <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-search text-muted"></i></span>
+      <input type="text" id="searchInput" class="form-control border-start-0 ps-0" placeholder="Search by Name, Roll No, or Class..." onkeyup="filterTable()">
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <form class="row gy-2 gx-3 align-items-end" id="report-form">
+      <div class="col-sm-4">
+        <label class="form-label">Date</label>
+        <input type="date" class="form-control" name="date">
+      </div>
+      <div class="col-sm-4">
+        <label class="form-label">Class</label>
+        <input type="text" class="form-control" name="class" placeholder="e.g., 8">
+      </div>
+      <div class="col-auto">
+        <button type="button" class="btn btn-outline-primary" onclick="exportData('csv')"><i class="fa-solid fa-file-csv me-2"></i>CSV</button>
+        <button type="button" class="btn btn-outline-success" onclick="exportData('excel')"><i class="fa-solid fa-file-excel me-2"></i>Excel</button>
+        <button type="button" class="btn btn-outline-danger" onclick="exportData('pdf')"><i class="fa-solid fa-file-pdf me-2"></i>PDF</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card mt-4 shadow-sm border-0 rounded-4">
+  <div class="card-header bg-white border-0 pt-4 pb-0 px-4">
+    <h5 class="fw-bold"><i class="fa-solid fa-list-check me-2 text-primary"></i> Recent Attendance Logs</h5>
+  </div>
+  <div class="card-body p-4">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle" id="logsTable">
+        <thead class="table-light">
+          <tr>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Roll No</th>
+            <th>Name</th>
+            <th>Class</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in logs %}
+          <tr>
+            <td class="text-muted">{{ log.date.strftime('%d %b %Y') }}</td>
+            <td class="fw-bold">{{ log.time.strftime('%I:%M:%S %p') }}</td>
+            <td><span class="badge bg-secondary">{{ log.student.roll_number }}</span></td>
+            <td class="fw-semibold">{{ log.student.name }}</td>
+            <td>{{ log.student.class_name }} {{ log.student.section or '' }}</td>
+            <td>
+              {% if log.status == 'Present' %}
+              <span class="text-success"><i class="fa-solid fa-check-circle me-1"></i>Present</span>
+              {% else %}
+              <span class="text-warning">{{ log.status }}</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="text-center text-muted py-4">No attendance records found yet.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  function filterTable() {
+      let input = document.getElementById("searchInput").value.toLowerCase();
+      let rows = document.querySelectorAll("#logsTable tbody tr");
+      rows.forEach(row => {
+          let text = row.innerText.toLowerCase();
+          row.style.display = text.includes(input) ? "" : "none";
+      });
+  }
+
+  function exportData(format) {
+    const form = document.getElementById('report-form');
+    const date = form.date.value;
+    const cls = form.class.value;
+    const params = new URLSearchParams();
+    if (date) params.append('date', date);
+    if (cls) params.append('class', cls);
+    params.append('format', format);
+    window.location = '{{ url_for("api.export_report") }}' + '?' + params.toString();
+  }
+</script>
+{% endblock %}
+
+

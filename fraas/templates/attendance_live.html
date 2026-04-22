@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row">
+  <div class="col-lg-8">
+    <div class="card mb-3 custom-card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 pt-4 pb-2 px-4 d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 fw-bold"><i class="fa-solid fa-camera-retro text-primary me-2"></i> Live Continuous Attendance</h5>
+        <span class="badge bg-secondary px-3 py-2 rounded-pill" id="camera-status"><i class="fa-solid fa-power-off me-1"></i> Camera: Off</span>
+      </div>
+      <div class="card-body text-center position-relative p-4">
+
+        <div class="d-flex justify-content-center mb-3">
+          <div class="input-group input-group-sm" style="max-width: 280px;">
+            <label class="input-group-text" for="cameraSelect"><i class="fa-solid fa-camera"></i></label>
+            <select id="cameraSelect" class="form-select">
+              <option value="0" selected>Camera 0 (Default)</option>
+              <option value="1">Camera 1 (External)</option>
+              <option value="2">Camera 2</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="mb-4 mt-2 d-flex justify-content-center gap-3">
+          <button id="btnStartAttendance" class="btn btn-primary shadow-sm px-4 fw-bold py-2"><i class="fa-solid fa-video me-2"></i> Start Attendance Session</button>
+          <button id="btnStopAttendance" class="btn btn-danger shadow-sm px-4 fw-bold py-2 d-none"><i class="fa-solid fa-circle-stop me-2"></i> Stop Attendance Session</button>
+        </div>
+
+        <div class="camera-wrapper bg-dark rounded-4 shadow-inner position-relative mx-auto overflow-hidden d-flex align-items-center justify-content-center" style="height: 480px; width: 640px; max-width: 100%;">
+          
+          <img id="video-stream" src="" class="img-fluid d-none" style="object-fit: cover; width: 100%; height: 100%;">
+          
+          <div id="camera-overlay-message" class="position-absolute top-0 start-50 translate-middle-x mt-4 bg-success text-white px-4 py-2 rounded-pill shadow fw-bold d-none" style="z-index: 100; transition: all 0.2s;">
+            <i class="fa-solid fa-check me-2"></i> Attendance Marked
+          </div>
+
+          <div id="camera-placeholder" class="text-white-50 text-center">
+            <i class="fa-solid fa-video-slash fa-4x mb-3 opacity-50"></i>
+            <p class="mb-0 font-monospace">System is standing by...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-lg-4">
+    <!-- Session Stats -->
+    <div class="card mb-3 custom-card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 pt-4 px-4">
+        <h6 class="fw-bold mb-0 text-secondary">Session Details</h6>
+      </div>
+      <div class="card-body px-4 pt-3 pb-4">
+        <div class="d-flex justify-content-between text-muted small mb-3 border-bottom pb-2">
+            <span>Total Responded:</span><span id="statDetected" class="fw-bold fs-6 text-dark font-monospace">0</span>
+        </div>
+        <div class="d-flex justify-content-between text-muted small mb-3 border-bottom pb-2">
+            <span>Successfully Marked:</span><span id="statMarked" class="fw-bold fs-6 text-success font-monospace">0</span>
+        </div>
+        <div class="d-flex justify-content-between text-muted small">
+            <span>Unknown Faces:</span><span id="statUnknown" class="fw-bold fs-6 text-danger font-monospace">0</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Live Activity Log -->
+    <div class="card custom-card border-0 shadow-sm" style="height: 420px;">
+      <div class="card-header bg-white border-0 pt-4 px-4 pb-2">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="fw-bold mb-0 text-secondary">Live Activity Log</h6>
+          <div class="spinner-grow spinner-grow-sm text-success d-none" id="logSpinner" role="status"></div>
+        </div>
+        <div class="input-group input-group-sm">
+          <span class="input-group-text bg-light border-0"><i class="fa-solid fa-search text-muted"></i></span>
+          <input type="text" id="searchInput" class="form-control bg-light border-0" placeholder="Search live logs..." onkeyup="filterLogs()">
+        </div>
+      </div>
+      <div class="card-body p-0 overflow-auto" id="liveActivityLog">
+        <div class="p-5 text-center text-muted" id="logEmptyState">
+            <i class="fa-solid fa-list-ul fa-2x mb-3 opacity-25"></i>
+            <p class="small mb-0">Logs will populate here once the session begins.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Session Summary Modal -->
+<div class="modal fade" id="summaryModal" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg rounded-4">
+      <div class="modal-header bg-primary text-white border-0">
+        <h5 class="modal-title fw-bold"><i class="fa-solid fa-flag-checkered me-2"></i> Session Complete</h5>
+      </div>
+      <div class="modal-body p-4 text-center">
+        <h4 class="mb-4">Session Summary</h4>
+        <div class="row g-3">
+            <div class="col-4">
+                <div class="p-3 bg-light rounded-3">
+                    <h3 class="text-dark fw-bold mb-0" id="sumTotal">0</h3>
+                    <small class="text-muted">Detected</small>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="p-3 bg-success-soft rounded-3">
+                    <h3 class="text-success fw-bold mb-0" id="sumMarked">0</h3>
+                    <small class="text-success">Marked</small>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="p-3 bg-danger-soft rounded-3">
+                    <h3 class="text-danger fw-bold mb-0" id="sumUnknown">0</h3>
+                    <small class="text-danger">Unknown</small>
+                </div>
+            </div>
+        </div>
+      </div>
+      <div class="modal-footer border-0 d-flex justify-content-center pb-4">
+        <button type="button" class="btn btn-primary px-5" data-bs-dismiss="modal">Close Summary</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1055;" id="toastContainer"></div>
+
+<script>
+  let lastConfirmationCheck = Date.now() / 1000;
+  let isCameraActive = false;
+
+  const btnStart = document.getElementById('btnStartAttendance');
+  const btnStop = document.getElementById('btnStopAttendance');
+  const videoImg = document.getElementById('video-stream');
+  const placeholder = document.getElementById('camera-placeholder');
+  const activeStatus = document.getElementById('camera-status');
+  const cameraSelect = document.getElementById('cameraSelect');
+  
+  const logContainer = document.getElementById('liveActivityLog');
+  const logEmpty = document.getElementById('logEmptyState');
+  const logSpinner = document.getElementById('logSpinner');
+
+  function updateStatsUI(stats) {
+      if(!stats) return;
+      document.getElementById('statDetected').innerText = stats.total_detected || 0;
+      document.getElementById('statMarked').innerText = stats.total_marked || 0;
+      document.getElementById('statUnknown').innerText = stats.total_unknown || 0;
+  }
+
+  function addLogItem(iconHtml, colorClass, text, serverTimeStr, extraHtml) {
+      logEmpty.classList.add('d-none');
+      const timeStr = serverTimeStr || new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute:'2-digit', second:'2-digit' });
+      const extra = extraHtml ? `<div class="mt-2 text-start">${extraHtml}</div>` : '';
+      const itemHTML = `
+        <div class="px-4 py-3 border-bottom d-flex align-items-center log-anim">
+            <div class="me-3 ${colorClass} fs-5">${iconHtml}</div>
+            <div class="flex-grow-1">
+                <p class="mb-0 fw-semibold text-dark">${text}</p>
+                ${extra}
+            </div>
+            <div class="text-muted small font-monospace">${timeStr}</div>
+        </div>
+      `;
+      logContainer.insertAdjacentHTML('afterbegin', itemHTML);
+      
+      if(logContainer.children.length > 50) {
+          logContainer.lastElementChild.remove();
+      }
+  }
+
+  function showToastMessage(msg, type='success') {
+      const icon = type === 'success' ? 'fa-check-circle' : 'fa-info-circle';
+      const bg = type === 'success' ? 'bg-success' : 'bg-warning text-dark';
+      const toastHtml = `
+        <div class="toast align-items-center text-white ${bg} border-0 show" role="alert" aria-live="assertive" aria-atomic="true">
+          <div class="d-flex">
+            <div class="toast-body fw-bold">
+               <i class="fa-solid ${icon} me-2"></i> ${msg}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+          </div>
+        </div>
+      `;
+      document.getElementById('toastContainer').insertAdjacentHTML('beforeend', toastHtml);
+      const newToast = document.getElementById('toastContainer').lastElementChild;
+      setTimeout(() => newToast.remove(), 4000);
+  }
+
+  btnStart.addEventListener('click', async () => {
+      btnStart.disabled = true;
+      activeStatus.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Starting...';
+      activeStatus.className = 'badge bg-warning text-dark px-3 py-2 rounded-pill';
+      
+      try {
+          const selectedCameraIndex = parseInt(cameraSelect.value, 10) || 0;
+          const res = await fetch('{{ url_for("attendance.start_camera") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ camera_index: selectedCameraIndex })
+          });
+          const data = await res.json();
+          
+          if(data.success) {
+              isCameraActive = true;
+              btnStart.classList.add('d-none');
+              btnStart.disabled = false;
+              btnStop.classList.remove('d-none');
+            cameraSelect.disabled = true;
+              logSpinner.classList.remove('d-none');
+              
+              // Reset UI counts instantly locally before real server state propagates back
+              updateStatsUI({total_detected: 0, total_marked: 0, total_unknown: 0});
+              
+              placeholder.classList.add('d-none');
+              videoImg.classList.remove('d-none');
+              videoImg.src = "{{ url_for('attendance.video_feed') }}?t=" + new Date().getTime();
+              
+              activeStatus.innerHTML = '<i class="fa-solid fa-record-vinyl blink me-1"></i> Camera: Active';
+              activeStatus.className = 'badge bg-success px-3 py-2 rounded-pill';
+              
+              addLogItem('<i class="fa-solid fa-play"></i>', 'text-primary', 'Attendance Session Started');
+          } else {
+              throw new Error("Backend reported failure");
+          }
+      } catch (err) {
+          btnStart.disabled = false;
+          activeStatus.innerHTML = '<i class="fa-solid fa-triangle-exclamation me-1"></i> Error';
+          activeStatus.className = 'badge bg-danger px-3 py-2 rounded-pill';
+          alert('Failed to start camera securely. Check backend logs.');
+      }
+  });
+
+  async function stopCameraLocally() {
+      if(!isCameraActive) return;
+      isCameraActive = false;
+      
+      btnStop.disabled = true;
+      
+      try {
+          await fetch('{{ url_for("attendance.stop_camera") }}', {method: 'POST'});
+      } catch (e) {
+          console.error("Error stopping backend camera", e);
+      }
+      
+      btnStop.classList.add('d-none');
+      btnStop.disabled = false;
+      btnStart.classList.remove('d-none');
+      cameraSelect.disabled = false;
+      logSpinner.classList.add('d-none');
+      
+      videoImg.src = "";
+      videoImg.classList.add('d-none');
+      placeholder.classList.remove('d-none');
+      
+      activeStatus.innerHTML = '<i class="fa-solid fa-power-off me-1"></i> Camera: Off';
+      activeStatus.className = 'badge bg-secondary px-3 py-2 rounded-pill';
+      
+      addLogItem('<i class="fa-solid fa-stop"></i>', 'text-secondary', 'Attendance Session Stopped');
+      
+      // Update Summary Modal
+      document.getElementById('sumTotal').innerText = document.getElementById('statDetected').innerText;
+      document.getElementById('sumMarked').innerText = document.getElementById('statMarked').innerText;
+      document.getElementById('sumUnknown').innerText = document.getElementById('statUnknown').innerText;
+      
+      // Show Summary Modal
+      const summaryModal = new bootstrap.Modal(document.getElementById('summaryModal'));
+      summaryModal.show();
+  }
+
+  btnStop.addEventListener('click', () => {
+      if(confirm("Are you sure you want to stop the attendance session?")) {
+          stopCameraLocally();
+      }
+  });
+
+  window.addEventListener('beforeunload', (e) => {
+      if(isCameraActive) {
+          navigator.sendBeacon('{{ url_for("attendance.stop_camera") }}');
+          e.preventDefault();
+          e.returnValue = "Attendance is currently running. Leave?";
+          return e.returnValue;
+      }
+  });
+
+  const lastSpokenTimestamps = {};
+
+  // Poll for attendance confirmations ONLY if camera is active
+  setInterval(async () => {
+    if(!isCameraActive) return;
+    
+    try {
+      const res = await fetch(`{{ url_for("attendance.get_confirmations") }}?since=${lastConfirmationCheck}`);
+      const data = await res.json();
+      
+      // Update the side panel numbers universally from backend reality
+      if (data.stats) {
+          updateStatsUI(data.stats);
+      }
+      
+      if (data.confirmations && data.confirmations.length > 0) {
+        data.confirmations.forEach(latest => {
+            console.log("[Live Tracker] Received DB Confirmation Payload:", latest);
+            
+            let icon, color, text, extraHtml = '';
+            if (latest.status === 'unknown') {
+                icon = '<i class="fa-solid fa-user-secret"></i>';
+                color = 'text-danger';
+                text = 'Unknown Face Detected';
+            } else if (latest.status === 'already_marked') {
+                icon = '<i class="fa-solid fa-clock-rotate-left"></i>';
+                color = 'text-warning';
+                text = `${latest.student_name} already marked`;
+                
+                // Show Camera Overlay feedback
+                const overlayCamera = document.getElementById('camera-overlay-message');
+                if(overlayCamera){
+                    overlayCamera.innerHTML = '<i class="fa-solid fa-info-circle me-2"></i> Already marked';
+                    overlayCamera.className = 'position-absolute top-0 start-50 translate-middle-x mt-4 bg-warning text-dark px-4 py-2 rounded-pill shadow fw-bold';
+                    overlayCamera.classList.remove('d-none');
+                    setTimeout(() => overlayCamera.classList.add('d-none'), 2000);
+                }
+                
+                try {
+                    const now = Date.now();
+                    if (!lastSpokenTimestamps[latest.student_id] || (now - lastSpokenTimestamps[latest.student_id]) > 3000) {
+                        const speechText = `${latest.student_name}, your attendance is already marked.`;
+                        console.log("[TTS] Speaking: " + speechText);
+                        const msg = new SpeechSynthesisUtterance(speechText);
+                        window.speechSynthesis.speak(msg);
+                        lastSpokenTimestamps[latest.student_id] = now;
+                    }
+                } catch(err) {
+                    console.error("SpeechSynthesis error:", err);
+                }
+            } else {
+                icon = '<i class="fa-solid fa-check-circle"></i>';
+                color = 'text-success';
+                text = `${latest.student_name} (ID: ${latest.roll_number}) marked present`;
+                
+                showToastMessage(`${latest.student_name} attendance marked successfully!`, 'success');
+                
+                // WhatsApp Button Logic
+                if (latest.phone) {
+                    const waMessage = `Dear Parent, ${latest.student_name} (Class: ${latest.class_name}) is marked present at ${latest.formatted_time} on ${latest.date_str}`;
+                    const waUrl = `https://wa.me/91${latest.phone}?text=${encodeURIComponent(waMessage)}`;
+                    extraHtml = `<a href="${waUrl}" target="_blank" class="btn btn-sm btn-success px-3 shadow-sm rounded-pill mt-1"><i class="fa-brands fa-whatsapp me-2"></i>Send WhatsApp Message</a> <small class="text-muted ms-2 align-middle">Click to send WhatsApp message</small>`;
+                }
+                
+                // Show Camera Overlay feedback
+                const overlayCamera = document.getElementById('camera-overlay-message');
+                if(overlayCamera){
+                    overlayCamera.innerHTML = '<i class="fa-solid fa-check me-2"></i> Attendance Marked';
+                    overlayCamera.className = 'position-absolute top-0 start-50 translate-middle-x mt-4 bg-success text-white px-4 py-2 rounded-pill shadow fw-bold';
+                    overlayCamera.classList.remove('d-none');
+                    setTimeout(() => overlayCamera.classList.add('d-none'), 2000);
+                }
+                
+                try {
+                    const now = Date.now();
+                    if (!lastSpokenTimestamps[latest.student_id] || (now - lastSpokenTimestamps[latest.student_id]) > 3000) {
+                        const speechText = `${latest.student_name}, your attendance is marked.`;
+                        console.log("[TTS] Speaking: " + speechText);
+                        const msg = new SpeechSynthesisUtterance(speechText);
+                        window.speechSynthesis.speak(msg);
+                        lastSpokenTimestamps[latest.student_id] = now;
+                    }
+                } catch(err) {
+                    console.error("SpeechSynthesis error:", err);
+                }
+            }
+            
+            addLogItem(icon, color, text, latest.formatted_time, extraHtml);
+            lastConfirmationCheck = Math.max(lastConfirmationCheck, latest.timestamp);
+        });
+      }
+    } catch (e) {
+      console.error('Error fetching confirmations:', e);
+    }
+  }, 1000); 
+
+  function filterLogs() {
+      let input = document.getElementById("searchInput").value.toLowerCase();
+      let logs = document.querySelectorAll("#liveActivityLog .log-anim");
+      logs.forEach(log => {
+          let text = log.innerText.toLowerCase();
+          log.classList.toggle('d-none', !text.includes(input) && !log.classList.contains('always-hidden'));
+          if(!text.includes(input)) {
+              log.style.setProperty("display", "none", "important");
+          } else {
+              log.style.display = "";
+          }
+      });
+  }
+</script>
+
+<style>
+.log-anim { animation: fadeInDown 0.3s ease-out; }
+@keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+</style>
+{% endblock %}
