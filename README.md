@@ -3,14 +3,37 @@
 FRAAS is a web-based facial recognition attendance system designed for rural schools with limited infrastructure.
 It uses a lightweight Flask backend, SQLite database, and OpenCV LBPH face recognition and is optimized to run on a single low-power machine (e.g., Windows laptop) entirely offline.
 
-## Ownership Notice
+## About the Author
 
-- Project author: Alok Kumar (LPU)
-- Signature text used in codebase: `Developed by Alok Kumar (LPU)`
-- Attribution headers: `X-Project-Signature`, `X-Project-Author`, `X-Project-Origin`
-- License: MIT (see LICENSE)
+Hi, I'm Vivek Kumar (Ovi Gupta) — a Software Developer & AI Enthusiast focused on building intelligent digital products.
 
-The project includes UI watermark, footer attribution, browser-console signature, and server response signature headers.
+I combine software engineering + artificial intelligence to create scalable, real-world solutions that solve practical problems. My approach is simple — build systems that are not just functional, but smart, efficient, and future-ready.
+
+🔹 Working on AI-driven systems and automation-based solutions
+🔹 Strong foundation in Software Development, Web Technologies & AI
+🔹 Passionate about turning ideas into real, usable products
+
+💡 What I Build
+🤖 AI-powered applications
+💻 Scalable software systems
+🌐 Modern full-stack web apps
+⚡ Performance-focused digital products
+
+🧠 Current Focus
+Artificial Intelligence & Machine Learning
+Real-world product development
+Startup-oriented SaaS solutions
+
+📌 Highlight Project
+FRAAS – AI-Powered Attendance System
+An intelligent facial recognition system that automates attendance using AI, designed especially for real-world use cases like institutions and organizations.
+
+🌐 Portfolio
+🔗 Portfolio Website: https://vivekg.vercel.app/
+👉 Showcasing my projects, skills, and development work
+
+🔗 Connect With Me
+💼 LinkedIn: https://www.linkedin.com/in/vivekkumar56/
 
 ## 1. Requirements
 
